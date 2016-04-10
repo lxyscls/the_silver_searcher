@@ -1,3 +1,5 @@
+## This fork focusses on improving ag's SMP performance
+
 # The Silver Searcher
 
 A code searching tool similar to `ack`, with a focus on speed.

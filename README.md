@@ -1,5 +1,8 @@
 ## This fork focusses on improving ag's SMP performance
 
+## [issues](https://github.com/lxyscls/PyGrep/issues)
+Because this branch is forked, so there is no issues.
+
 # The Silver Searcher
 
 A code searching tool similar to `ack`, with a focus on speed.

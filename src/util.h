@@ -27,6 +27,22 @@ pthread_key_t worker_key;
 #define FALSE 0
 #endif
 
+typedef struct {
+    volatile int locked;
+} ag_spinlock_t;
+
+static inline void ag_spinlock_init(ag_spinlock_t *sl) {
+    sl->locked = 0;
+}
+
+static inline void ag_spinlock_lock(ag_spinlock_t *sl) {
+    while (__sync_lock_test_and_set(&sl->locked, 1)) ;
+}
+
+static inline void ag_spinlock_unlock(ag_spinlock_t *sl) {
+    __sync_lock_release(&sl->locked);
+}
+
 #define INIT_AGDSLEN 1024
 #define MAX_AGDS_PREALLOC (1024*1024)
 

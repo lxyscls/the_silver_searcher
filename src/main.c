@@ -113,6 +113,9 @@ int main(int argc, char **argv) {
     if (pthread_cond_init(&files_ready, NULL)) {
         die("pthread_cond_init failed!");
     }
+    if (pthread_mutex_init(&print_mtx, NULL)) {
+        die("pthread_mutex_init failed!");
+    }
     if (opts.stats && pthread_mutex_init(&stats_mtx, NULL)) {
         die("pthread_mutex_init failed!");
     }
@@ -122,7 +125,6 @@ int main(int argc, char **argv) {
     if (pthread_key_create(&worker_key, ag_freespecific)) {
         die("pthread_key_create failed!");
     }
-    ag_spinlock_init(&print_lock);
 
     if (opts.casing == CASE_SMART) {
         opts.casing = is_lowercase(opts.query) ? CASE_INSENSITIVE : CASE_SENSITIVE;
@@ -219,6 +221,7 @@ int main(int argc, char **argv) {
     cleanup_options();
     pthread_cond_destroy(&files_ready);
     pthread_mutex_destroy(&work_queue_mtx);
+    pthread_mutex_destroy(&print_mtx);
     pthread_key_delete(worker_key);
     cleanup_ignore(root_ignores);
     free(workers);

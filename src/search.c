@@ -170,7 +170,7 @@ multiline_done:
         if (!opts.print_filename_only && !binary) {
             convert_file_matches(dir_full_path, buf, buf_len, matches, matches_len);
         }
-        ag_spinlock_lock(&print_lock);
+        pthread_mutex_lock(&print_mtx);
         ag_lockspecific();
         if (opts.print_filename_only) {
             /* If the --files-without-matches or -L option is passed we should
@@ -194,7 +194,7 @@ multiline_done:
             print_file_matches();
         }
         ag_unlockspecific();
-        ag_spinlock_unlock(&print_lock);
+        pthread_mutex_unlock(&print_mtx);
         opts.match_found = 1;
     } else if (opts.search_stream && opts.passthrough) {
         fprintf(out_fd, "%s", buf);
@@ -524,9 +524,9 @@ void search_dir(ignores *ig, const char *base_path, const char *path, const int 
                     goto cleanup;
                 } else if (opts.match_files) {
                     log_debug("match_files: file_search_regex matched for %s.", dir_full_path);
-                    ag_spinlock_lock(&print_lock);
+                    pthread_mutex_lock(&print_mtx);
                     print_path(dir_full_path, opts.path_sep);
-                    ag_spinlock_unlock(&print_lock);
+                    pthread_mutex_unlock(&print_mtx);
                     opts.match_found = 1;
                     goto cleanup;
                 }

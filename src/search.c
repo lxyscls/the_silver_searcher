@@ -170,7 +170,7 @@ multiline_done:
         if (!opts.print_filename_only && !binary) {
             convert_file_matches(dir_full_path, buf, buf_len, matches, matches_len);
         }
-        pthread_mutex_lock(&print_mtx);
+        //pthread_mutex_lock(&print_mtx);
         ag_lockspecific();
         if (opts.print_filename_only) {
             /* If the --files-without-matches or -L option is passed we should
@@ -194,7 +194,7 @@ multiline_done:
             print_file_matches();
         }
         ag_unlockspecific();
-        pthread_mutex_unlock(&print_mtx);
+        //pthread_mutex_unlock(&print_mtx);
         opts.match_found = 1;
     } else if (opts.search_stream && opts.passthrough) {
         fprintf(out_fd, "%s", buf);
@@ -338,6 +338,7 @@ cleanup:
 void *search_file_worker(void *i) {
     work_queue_t *queue_item;
     int worker_id = *(int *)i;
+    result_queue_t *result_item;
 
     ag_setspecific();
 
@@ -346,9 +347,10 @@ void *search_file_worker(void *i) {
         pthread_mutex_lock(&work_queue_mtx);
         while (work_queue == NULL) {
             if (done_adding_files) {
+                ++workers_done;
                 pthread_mutex_unlock(&work_queue_mtx);
-                log_debug("Worker %i finished.", worker_id);
-                pthread_exit(NULL);
+                log_debug("Worker %i search done.", worker_id);
+                goto presult;
             }
             pthread_cond_wait(&files_ready, &work_queue_mtx);
         }
@@ -362,6 +364,29 @@ void *search_file_worker(void *i) {
         search_file(queue_item->path);
         free(queue_item->path);
         free(queue_item);
+	}
+
+presult:
+    while (TRUE) {
+        pthread_mutex_lock(&result_queue_mtx);
+        while (result_queue == NULL) {
+            if (workers_done == workers_len) {
+                pthread_cond_broadcast(&result_ready);
+                pthread_mutex_unlock(&result_queue_mtx);
+                log_debug("Worker %i finished.", worker_id);
+                pthread_exit(NULL);
+            }
+            pthread_cond_wait(&result_ready, &result_queue_mtx);
+        }
+        result_item = result_queue;
+        result_queue = result_queue->next;
+        if (result_queue == NULL) {
+            result_queue_tail = NULL;
+        }
+        pthread_mutex_unlock(&result_queue_mtx);
+        fprintf(out_fd, "%s", result_item->result);
+        ag_dsfree(result_item->result);
+        free(result_item);
     }
 }
 

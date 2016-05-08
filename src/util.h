@@ -49,7 +49,7 @@ static inline void ag_spinlock_unlock(ag_spinlock_t *sl) {
 typedef char *ag_ds;
 
 typedef struct {
-    int lock;
+    volatile int lock;
     ag_ds ds;
 } ag_specific_t;
 

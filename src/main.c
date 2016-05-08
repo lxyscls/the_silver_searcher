@@ -55,8 +55,8 @@ int main(int argc, char **argv) {
     int pcre_opts = PCRE_MULTILINE;
     int study_opts = 0;
     worker_t *workers = NULL;
-    int workers_len;
     int num_cores;
+    result_queue_t *result_item;
 
 #ifdef HAVE_PLEDGE
     if (pledge("stdio rpath proc exec", NULL) == -1) {
@@ -113,6 +113,9 @@ int main(int argc, char **argv) {
     if (pthread_cond_init(&files_ready, NULL)) {
         die("pthread_cond_init failed!");
     }
+    if (pthread_cond_init(&result_ready, NULL)) {
+        die("pthread_cond_init failed!");
+    }
     if (pthread_mutex_init(&print_mtx, NULL)) {
         die("pthread_mutex_init failed!");
     }
@@ -120,6 +123,9 @@ int main(int argc, char **argv) {
         die("pthread_mutex_init failed!");
     }
     if (pthread_mutex_init(&work_queue_mtx, NULL)) {
+        die("pthread_mutex_init failed!");
+    }
+    if (pthread_mutex_init(&result_queue_mtx, NULL)) {
         die("pthread_mutex_init failed!");
     }
     if (pthread_key_create(&worker_key, ag_freespecific)) {
@@ -198,6 +204,29 @@ int main(int argc, char **argv) {
         done_adding_files = TRUE;
         pthread_cond_broadcast(&files_ready);
         pthread_mutex_unlock(&work_queue_mtx);
+
+        while (TRUE) {
+            pthread_mutex_lock(&result_queue_mtx);
+            while (result_queue == NULL) {
+                if (workers_done == workers_len) {
+                    //pthread_cond_broadcast(&result_ready);
+                    pthread_mutex_unlock(&result_queue_mtx);
+                    goto pjoin;
+                }
+                pthread_cond_wait(&result_ready, &result_queue_mtx);
+            }
+            result_item = result_queue;
+            result_queue = result_queue->next;
+            if (result_queue == NULL) {
+                result_queue_tail = NULL;
+            }
+            pthread_mutex_unlock(&result_queue_mtx);
+            fprintf(out_fd, "%s", result_item->result);
+            ag_dsfree(result_item->result);
+            free(result_item);
+        }
+
+pjoin:
         for (i = 0; i < workers_len; i++) {
             if (pthread_join(workers[i].thread, NULL)) {
                 die("pthread_join failed!");
@@ -220,7 +249,9 @@ int main(int argc, char **argv) {
     }
     cleanup_options();
     pthread_cond_destroy(&files_ready);
+    pthread_cond_destroy(&result_ready);
     pthread_mutex_destroy(&work_queue_mtx);
+    pthread_mutex_destroy(&result_queue_mtx);
     pthread_mutex_destroy(&print_mtx);
     pthread_key_delete(worker_key);
     cleanup_ignore(root_ignores);

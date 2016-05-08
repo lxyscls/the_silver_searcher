@@ -40,13 +40,26 @@ struct work_queue_t {
 };
 typedef struct work_queue_t work_queue_t;
 
+struct result_queue_t {
+    ag_ds result;
+    struct result_queue_t *next;
+};
+typedef struct result_queue_t result_queue_t;
+
+volatile int workers_len;
+volatile int workers_done;
+
 work_queue_t *work_queue;
 work_queue_t *work_queue_tail;
+result_queue_t *result_queue;
+result_queue_t *result_queue_tail;
 int done_adding_files;
 pthread_cond_t files_ready;
+pthread_cond_t result_ready;
 pthread_mutex_t print_mtx;
 pthread_mutex_t stats_mtx;
 pthread_mutex_t work_queue_mtx;
+pthread_mutex_t result_queue_mtx;
 ag_spinlock_t print_spin;
 
 

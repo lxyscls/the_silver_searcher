@@ -9,6 +9,7 @@
 #include "options.h"
 #include "print.h"
 #include "util.h"
+#include "search.h"
 #ifdef _WIN32
 #define fprintf(...) fprintf_w32(__VA_ARGS__)
 #endif
@@ -19,14 +20,28 @@ const char *color_reset = "\033[0m\033[K";
 
 const char *truncate_marker = " [...]";
 
-static inline int ag_fprintf(FILE *stream, const char *format, ...) {
+static inline int ag_fprintf(__attribute__((unused)) FILE *stream, const char *format, ...) {
     int ret;
     va_list args;
+    result_queue_t *result_item;
     ag_specific_t *as = (ag_specific_t *) ag_getspecific();
 
     va_start(args, format);
     if (as->lock) {
-        ret = fprintf(stream, format, args);
+        //ret = fprintf(stream, format, args);
+        result_item = ag_malloc(sizeof(result_queue_t));
+        result_item->result = as->ds;
+        result_item->next = NULL;
+        pthread_mutex_lock(&result_queue_mtx);
+        if (result_queue_tail == NULL) {
+            result_queue = result_item;
+        } else {
+            result_queue_tail->next = result_item;
+        }
+        result_queue_tail = result_item;
+        pthread_cond_signal(&result_ready);
+        pthread_mutex_unlock(&result_queue_mtx);
+        as->ds = ag_dsnew(INIT_AGDSLEN);
     } else {
         as->ds = ag_vsprintf(as->ds, format, args, &ret);
     }
@@ -124,7 +139,7 @@ void print_binary_file_matches(const char *path) {
 
 void print_file_matches(void) {
     ag_specific_t *as = (ag_specific_t *) ag_getspecific();
-    fprintf(out_fd, "%s", as->ds);
+    ag_fprintf(out_fd, "%s", as->ds);
 }
 
 void convert_file_matches(const char *path, const char *buf, const size_t buf_len, const match_t matches[], const size_t matches_len) {
@@ -141,9 +156,6 @@ void convert_file_matches(const char *path, const char *buf, const size_t buf_le
     size_t i, j;
     int in_a_match = FALSE;
     int printing_a_match = FALSE;
-    ag_specific_t *as = (ag_specific_t *) ag_getspecific();
-
-    ag_dsreset(as->ds);
 
     if (opts.ackmate || opts.vimgrep) {
         sep = ':';

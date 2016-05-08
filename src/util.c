@@ -128,7 +128,7 @@ void ag_unlockspecific(void) {
 }
 
 void ag_freespecific(void *data) {
-    ag_dsfree(((ag_specific_t *)data)->ds);
+    //ag_dsfree(((ag_specific_t *)data)->ds);
     free(data);
 }
 
